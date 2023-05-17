@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Wifi.h>
-#include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 #include "env.h" 
 
 #define endpoint ""
@@ -29,12 +29,14 @@ void setup() {
 	pinMode(fanPin,OUTPUT);
   pinMode(lightPin,OUTPUT);
 
-	// WiFi_SSID and WIFI_PASS should be in the env.h
+	// WiFi_SSID and WIFI_PASS in env.h
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println("");
-	// Connect to wifi
+
+	// Connect to the wifi
   Serial.println("Connecting");
-  while(WiFi.status() != WL_CONNECTED) {
+  while(WiFi.status() != WL_CONNECTED)
+   {
     delay(500);
     Serial.print(".");
   }
@@ -43,7 +45,8 @@ void setup() {
   Serial.println(WiFi.localIP());
 }
 
-void loop() {
+void loop()
+ {
   //Check WiFi connection status
   if(WiFi.status()== WL_CONNECTED){
     Serial.println("");
@@ -70,14 +73,14 @@ void loop() {
     docput["presence"] = getpresence();
   
 
-    // convert JSON document, doc, to string and copies it into the httpRequestData
+    // Convert JSON document, doc, to a string and copy into the httpRequestData
     serializeJson(docput, httpRequestData);
 
     // Send HTTP PUT request
     int httpResponseCode = http.PUT(httpRequestData);
     String http_response;
 
-    // check reuslt of PUT request. negative response code means server wasn't reached
+    // Checking result of PUT request. A negative response code means server wasn't reached
     if (httpResponseCode>0) {
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
