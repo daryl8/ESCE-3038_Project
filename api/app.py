@@ -15,7 +15,8 @@ from geopy.geocoders import Nominatim
 app = FastAPI()
 
 origins = [
-    "https://simple-smart-hub-client.netlify.app"
+    "https://simple-smart-hub-client.netlify.app",
+    "https://esce3038-iotproject.onrender.com"
 ]
 
 app.add_middleware(
