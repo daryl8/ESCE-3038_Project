@@ -143,7 +143,7 @@ async def update(request: Request):
 
     condition["light"] = ((present_time < input_light) and (present_time < off_time ) & (condition["presence"] == 1))
     condition["fan"] = ((float(condition["temperature"]) >= temperature) & (condition["presence"]== 1))
-    condition["current_time"]= str(datetime.now())
+    condition["present_time"]= str(datetime.now())
 
     settings_new = await esp_data.insert_one(condition)
     new_obj = await esp_data.find_one({"_id":settings_new.inserted_id}) 
@@ -161,7 +161,7 @@ async def get_state():
             "fan": False,
             "light": False,
             "presence": False,
-            "current_time": datetime.now()
+            "present_time": datetime.now()
         }
 
     return final_entry
