@@ -103,12 +103,12 @@ async def get_stored_data(request: Request):
     else:
         light_buffer = datetime.strptime(light_input, "%H:%M:%S")
     
-    new_user_light = light_buffer + parse_time(light_time_off)
+    first_user_light = light_buffer + parse_time(light_time_off)
 
     output_result = {
         "user_temp": input_temp,
         "user_light": str(light_buffer.time()),
-        "light_time_off": str(new_user_light.time())
+        "light_time_off": str(first_user_light.time())
         }
    
     object = await sensor_data.find().sort('_id', -1).limit(1).to_list(1)
