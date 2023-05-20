@@ -14,7 +14,7 @@
 
 float getTemp(){
 
-  return random(21.1,33.1);
+  return random(21.1, 33.1);
 }
 
 float getpresence(){
@@ -28,13 +28,14 @@ void setup() {
 
 	pinMode(fanPin,OUTPUT);
   pinMode(lightPin,OUTPUT);
+  pinMode(presencePin, OUTPUT);
 
 	// WiFi_SSID and WIFI_PASS in env.h
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   Serial.println("");
 
 	// Connect to the wifi
-  Serial.println("Connecting");
+  Serial.println("Connecting...");
   while(WiFi.status() != WL_CONNECTED)
    {
     delay(500);
@@ -56,6 +57,7 @@ void loop()
     // Establish a connection to the server
     String url = "https://" + String(endpoint) + "/temperature";
     http.begin(url);
+    http.addHeader("Content-length", "24");
     http.addHeader("Content-type", "application/json");
 
 
@@ -97,7 +99,7 @@ void loop()
     http.end();
 
 
-    url = "https://" + String(endpoint) + "/state";    
+    http.end();   
     http.begin(url);
     httpResponseCode = http.GET();
 

@@ -1,67 +1,56 @@
-from fastapi import FastAPI, HTTPException, Request
-from pymongo import MongoClient
-from datetime import datetime, timedelta
-from geopy.geocoders import Nominatim
 from fastapi.middleware.cors import CORSMiddleware
-from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient
-import re
-import requests
+from fastapi import FastAPI, Request
+import pytz
 import datetime
 import pydantic
+import requests
+from bson import ObjectId
+import re
 import motor.motor_asyncio
-import pytz
-import random
+from datetime import datetime, timedelta
+from geopy.geocoders import Nominatim
+
+
 
 app = FastAPI()
 
-
 origins = [
-    "https://simple-smart-hub-client.netlify.app",
-    "http://127.0.0.1:8000"
+    "https://simple-smart-hub-client.netlify.app"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 
 client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://IoTproject:iotproject@cluster0.ambk2jl.mongodb.net/")
-db = client.iot_platform
-sensor_readings = db['sensor_readings']
-data = db['data']
-
-
+db = client.iotproject
+sensor_data = db['sensor_data']
+esp_data = db['data']
 
 # Initialize Nominatim API
-geolocator = Nominatim(user_agent="MyApp")
+geo_locator = Nominatim(user_agent="MyApp")
 
-location = geolocator.geocode("Hyderabad")
+location = geo_locator.geocode("Hyderabad")
 
 
 def get_sunset():
-    user_latitude =  location.latitude
-    user_longitude = location.longitude
+    latitude_location =  location.latitude
+    longitude_location = location.longitude
 
-    sunset_api_endpoint = f'https://api.sunrise-sunset.org/json?lat={user_latitude}&lng={user_longitude}'
+    sunset_api_endpoint = f'https://api.sunrise-sunset.org/json?lat={latitude_location}&lng={longitude_location}'
 
     sunset_api_response = requests.get(sunset_api_endpoint)
-    sunset_api_data = sunset_api_response.json()
+    sunset_api_reading = sunset_api_response.json()
 
-    sunset_time = datetime.datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
+    time_of_sunset = datetime.strptime(sunset_api_reading['results']['sunset'], '%I:%M:%S %p').time()
     
-    return datetime.datetime.strptime(str(sunset_time),"%H:%M:%S")
-
-current_date = datetime.date.today()
-now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
-datetime2 = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
-
+    return datetime.strptime(str(time_of_sunset),"%H:%M:%S")
 
 
 regex = re.compile(r'((?P<hours>\d+?)h)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
@@ -77,81 +66,101 @@ def parse_time(time_str):
             time_params[name] = int(param)
     return timedelta(**time_params)
 
-
-
 @app.get("/")
 async def home():
-    return {"message": "ECSE3038 - Project"}
-
-
+    return {"message": "ECSE3038_Project"}
 
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await sensor_readings.find().to_list(size)
-    data = []
-    for reading in readings:
-        data.append({
-            "temperature": reading["user_temp"],
-            "presence": random.choice([True, False]),
-            "datetime":reading["user_light"]
+    read_values = await esp_data.find().sort('_id', -1).limit(size).to_list(size)
+    reading_data = []
+    for things in read_values:
+        temperature = things.get("temperature")
+        presence = things.get("presence")
+        present_time = things.get("present_time")
+
+        reading_data.append({
+            "temperature": temperature,
+            "presence": presence,
+            "datetime": present_time
         })
-    return data
+
+    return reading_data
 
 @app.put('/settings')
-async def get_sensor_readings(request: Request):
-    state = await request.json()
-    #final_sunset_time = str(get_sunset())
-    user_temp = state["user_temp"]
-    user_light = state["user_light"]
-    light_time_off = state["light_duration"]
-
-    if user_light == "sunset":
-        user_light_scr = get_sunset()
-    else:
-        user_light_scr = datetime.datetime.strptime(user_light, "%H:%M:%S")
+async def get_stored_data(request: Request):
+    condition = await request.json()
     
-    new_user_light = user_light_scr + parse_time(light_time_off)
+    input_temp = condition["user_temp"]
+    input_light = condition["user_light"]
+    light_time_off = condition["light_duration"]
+    
 
-    output = {
-        "user_temp": user_temp,
-        "user_light": str(user_light_scr.time()),
+    if input_light == "sunset":
+        light_buffer = get_sunset()
+    else:
+        light_buffer = datetime.strptime(input_light, "%H:%M:%S")
+    
+    new_user_light = light_buffer + parse_time(light_time_off)
+
+    final_output = {
+        "user_temp": input_temp,
+        "user_light": str(light_buffer.time()),
         "light_time_off": str(new_user_light.time())
         }
-    new_settings = await sensor_readings.insert_one(output)
-    created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
-    return created_settings
+   
+    object = await sensor_data.find().sort('_id', -1).limit(1).to_list(1)
+
+    if object:
+        await sensor_data.update_one({"_id": object[0]["_id"]}, {"$set": final_output})
+        object_new = await sensor_data.find_one({"_id": object[0]["_id"]})
+    else:
+        new = await sensor_data.insert_one(final_output)
+        object_new = await sensor_data.find_one({"_id": new.inserted_id})
+    return object_new
 
 
+@app.post("/temp_presence")
+
+async def update(request: Request): 
+    condition = await request.json()
+
+    variable = await sensor_data.find().sort('_id', -1).limit(1).to_list(1)
+    if variable:
+        temperature = variable[0]["user_temp"]   
+        input_light = datetime.strptime(variable[0]["user_light"], "%H:%M:%S")
+        off_time = datetime.strptime(variable[0]["light_time_off"], "%H:%M:%S")
+    else:
+        temperature = 28
+        input_light = datetime.strptime("18:00:00", "%H:%M:%S")
+        off_time = datetime.strptime("20:00:00", "%H:%M:%S")
+
+    now_time = datetime.now(pytz.timezone('Jamaica')).time()
+    current_time = datetime.strptime(str(now_time),"%H:%M:%S.%f")
 
 
-@app.put("/temperature")
-async def toggle(request: Request): 
-  state = await request.json()
-#   state["light"] = (datetime1<datetime2)
-#   state["fan"] = (float(state["temperature"]) >= 28.0)
-#   state["pir"] = (state["presence"]==1)
+    condition["light"] = ((current_time < input_light) and (current_time < off_time ) & (condition["presence"] == 1))
+    condition["fan"] = ((float(condition["temperature"]) >= temperature) & (condition["presence"]== 1))
+    condition["current_time"]= str(datetime.now())
 
-  state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
-  state["fan"] = ((float(state["temperature"]) >= 28.0) & (state["presence"]=="1"))
-
-  obj = await data.find_one({"tobe":"updated"})
-  if obj:
-    await data.update_one({"tobe":"updated"}, {"$set": state})
-  else:
-    await data.insert_one({**state, "tobe": "updated"})
-  new_obj = await data.find_one({"tobe":"updated"}) 
-  return new_obj,204
+    new_settings = await esp_data.insert_one(condition)
+    new_obj = await esp_data.find_one({"_id":new_settings.inserted_id}) 
+    return new_obj
 
 
-
-@app.get("/state")
+#retreves last entry
+@app.get("/condiotion")
 async def get_state():
-  state = await data.find_one({"tobe": "updated"})
-  
-  state["fan"] = (float(state["temperature"]) >= 28.0) 
-  state["light"] = (get_sunset()<datetime2)
+    final_entry = await esp_data.find().sort('_id', -1).limit(1).to_list(1)
 
-  if state == None:
-    return {"fan": False, "light": False}
-  return state
+    if not final_entry:
+        return {
+            
+            "fan": False,
+            "light": False,
+            "presence": False,
+            "current_time": datetime.now()
+        }
+
+    return final_entry
