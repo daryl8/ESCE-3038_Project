@@ -79,7 +79,7 @@ void loop()
     serializeJson(docput, httpRequestData);
 
     // Send HTTP PUT request
-    int httpResponseCode = http.PUT(httpRequestData);
+    int httpResponseCode = http.POST(httpRequestData);
     String http_response;
 
     // Checking result of PUT request. A negative response code means server wasn't reached

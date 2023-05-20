@@ -122,7 +122,7 @@ async def get_stored_data(request: Request):
     return object_new
 
 
-@app.post("/temp_presence")
+@app.post("/temperature")
 
 async def update(request: Request): 
     condition = await request.json()
