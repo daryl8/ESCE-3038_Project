@@ -93,18 +93,18 @@ async def get_stored_data(request: Request):
     condition = await request.json()
     
     input_temp = condition["user_temp"]
-    input_light = condition["user_light"]
+    light_input = condition["user_light"]
     light_time_off = condition["light_duration"]
     
 
-    if input_light == "sunset":
+    if light_input == "sunset":
         light_buffer = get_sunset()
     else:
-        light_buffer = datetime.strptime(input_light, "%H:%M:%S")
+        light_buffer = datetime.strptime(light_input, "%H:%M:%S")
     
     new_user_light = light_buffer + parse_time(light_time_off)
 
-    final_output = {
+    output_result = {
         "user_temp": input_temp,
         "user_light": str(light_buffer.time()),
         "light_time_off": str(new_user_light.time())
@@ -113,10 +113,10 @@ async def get_stored_data(request: Request):
     object = await sensor_data.find().sort('_id', -1).limit(1).to_list(1)
 
     if object:
-        await sensor_data.update_one({"_id": object[0]["_id"]}, {"$set": final_output})
+        await sensor_data.update_one({"_id": object[0]["_id"]}, {"$set": output_result})
         object_new = await sensor_data.find_one({"_id": object[0]["_id"]})
     else:
-        new = await sensor_data.insert_one(final_output)
+        new = await sensor_data.insert_one(output_result)
         object_new = await sensor_data.find_one({"_id": new.inserted_id})
     return object_new
 
@@ -137,20 +137,20 @@ async def update(request: Request):
         off_time = datetime.strptime("20:00:00", "%H:%M:%S")
 
     now_time = datetime.now(pytz.timezone('Jamaica')).time()
-    current_time = datetime.strptime(str(now_time),"%H:%M:%S.%f")
+    present_time = datetime.strptime(str(now_time),"%H:%M:%S.%f")
 
 
-    condition["light"] = ((current_time < input_light) and (current_time < off_time ) & (condition["presence"] == 1))
+    condition["light"] = ((present_time < input_light) and (present_time < off_time ) & (condition["presence"] == 1))
     condition["fan"] = ((float(condition["temperature"]) >= temperature) & (condition["presence"]== 1))
     condition["current_time"]= str(datetime.now())
 
-    new_settings = await esp_data.insert_one(condition)
-    new_obj = await esp_data.find_one({"_id":new_settings.inserted_id}) 
+    settings_new = await esp_data.insert_one(condition)
+    new_obj = await esp_data.find_one({"_id":settings_new.inserted_id}) 
     return new_obj
 
 
 #retreves last entry
-@app.get("/condiotion")
+@app.get("/condition")
 async def get_state():
     final_entry = await esp_data.find().sort('_id', -1).limit(1).to_list(1)
 

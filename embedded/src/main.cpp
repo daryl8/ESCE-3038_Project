@@ -4,7 +4,7 @@
 #include <HTTPClient.h>
 #include "env.h" 
 
-#define endpoint ""
+#define endpoint "https://esce3038-iotproject.onrender.com"
 
 #define presencePin 24
 #define fanPin 22
